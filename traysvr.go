@@ -13,10 +13,12 @@ import (
 )
 
 func (p *_SystraySvr) Run() error {
-	_, err := exec.Command(p.clientPath).Output()
-	if err != nil {
-		return err
-	}
+	go func() {
+		_, err := exec.Command(p.clientPath).Output()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	return p.serve()
 }
 
