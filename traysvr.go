@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"io"
 	"net"
 	"os/exec"
@@ -14,28 +13,26 @@ import (
 )
 
 func (p *_SystraySvr) Run() error {
-	out, err := exec.Command(p.clientPath).Output()
-	if err != nil {
-		return err
-	}
-	if out != nil {
-		return errors.New(string(out))
-	}
+	go func() {
+		_, err := exec.Command(p.clientPath).Output()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	return p.serve()
 }
 
 func (p *_SystraySvr) Stop() error {
-	cmd := map[string]string{
-		"action": "exit",
-	}
+	cmd := map[string]string{"action": "exit"}
 	return p.send(cmd)
 }
 
-func (p *_SystraySvr) Show(file string) error {
-	cmd := map[string]string{
-		"action": "show",
-		"path": filepath.Join(p.iconPath, file),
+func (p *_SystraySvr) Show(file string, hint string) error {
+	path, err := filepath.Abs(filepath.Join(p.iconPath, file))
+	if err != nil {
+		return err
 	}
+	cmd := map[string]string{"action": "show", "path": path, "hint": hint}
 	return p.send(cmd)
 }
 
@@ -44,7 +41,7 @@ func (p *_SystraySvr) OnClick(fun func()) {
 }
 
 func _NewSystraySvr(iconPath string, clientPath string, port int) *_SystraySvr {
-	return &_SystraySvr{iconPath, clientPath, port, make(map[net.Conn]bool), func(){}, sync.Mutex{}}
+	return &_SystraySvr{iconPath, clientPath, port, make(map[net.Conn]bool), nil, func(){}, sync.Mutex{}}
 }
 
 func (p *_SystraySvr) serve() error {
@@ -64,18 +61,18 @@ func (p *_SystraySvr) serve() error {
 			p.conns[conn] = true
 			p.lock.Unlock()
 
+			p.resend(conn)
+
 			for {
 				n := uint32(0)
 				err := binary.Read(conn, binary.LittleEndian, &n)
 				if err != nil {
-					println(err.Error())
 					break
 				}
 
 				buf := new(bytes.Buffer)
 				_, err = io.CopyN(buf, conn, int64(n))
 				if err != nil {
-					println(err.Error())
 					break
 				}
 
@@ -83,7 +80,6 @@ func (p *_SystraySvr) serve() error {
 				kvs := map[string]string{}
 				err = json.Unmarshal(data, &kvs)
 				if err != nil {
-					println(err.Error())
 					continue
 				}
 				p.received(kvs)
@@ -97,14 +93,33 @@ func (p *_SystraySvr) serve() error {
 	}
 }
 
+func (p *_SystraySvr) resend(conn net.Conn) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	_, err := conn.Write(p.lastest)
+	return err
+}
+
 func (p *_SystraySvr) send(cmd map[string]string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	data, err := json.Marshal(cmd)
 	if err != nil {
 		return err
 	}
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, uint32(len(data)))
+	if err != nil {
+		return err
+	}
+	err = binary.Write(buf, binary.LittleEndian, data)
+	if err != nil {
+		return err
+	}
+	data = buf.Bytes()
+	p.lastest = data
 
 	ok := 0
 	for conn, _ := range p.conns {
@@ -115,12 +130,8 @@ func (p *_SystraySvr) send(cmd map[string]string) error {
 			ok += 1
 		}
 	}
-	if ok == 0 {
-		if err != nil {
-			return err
-		} else {
-			return errors.New("no conns")
-		}
+	if ok == 0 && err != nil {
+		return err
 	}
 	return nil
 }
@@ -141,6 +152,7 @@ type _SystraySvr struct {
 	clientPath string
 	port int
 	conns map[net.Conn]bool
+	lastest []byte
 	fclicked func()
 	lock sync.Mutex
 }

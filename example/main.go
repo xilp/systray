@@ -23,21 +23,21 @@ func main() {
 	tray.OnClick(func() {
 		println("clicked")
 	})
-	err := tray.Show("idle.png")
+	err := tray.Show("idle.ico", "Test systray")
 	if err != nil {
 		println(err.Error())
-		return
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		println("Input icon file name:")
+		print(">> ")
 		data, _, _ := reader.ReadLine()
 		line := string(data)
 		if len(line) == 0 {
 			break;
 		}
-		err := tray.Show(line)
+		err := tray.Show(line, line)
 		if err != nil {
 			println(err.Error())
 		}
