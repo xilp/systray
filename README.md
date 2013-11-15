@@ -9,9 +9,9 @@ Instead of gui program, "go-program + systray + web-console" might be a interest
 
 # Platform
 
-Mac: avalid
-Win: coming soon
-Linux: not yet
+Mac: avalid  
+Win: coming soon  
+Linux: not yet  
 
 
 ## Run example
