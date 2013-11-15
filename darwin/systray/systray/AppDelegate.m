@@ -10,9 +10,13 @@
     port = 6333;
 
     statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    [statusItem setTitle:@"D"];
     [statusItem setAction:@selector(clicked:)];
     [statusItem setHighlightMode:YES];
+
+    timer = [NSTimer scheduledTimerWithTimeInterval:3 target:self selector:@selector(handleTimer:) userInfo:nil repeats:YES];
+    unconnected = YES;
+
+    icons = [[NSMutableDictionary alloc] init];
 
     headReading = 4;
     bodyReading = 0;
@@ -22,11 +26,31 @@
 }
 
 - (IBAction)clicked:(id)sender {
-    [self open];
-    NSLog(@"click!");
+    NSMutableDictionary *cmd = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"clicked", @"action", nil];
+    [self send:cmd];
+}
+
+- (void)send:(NSMutableDictionary*)cmd {
+    NSError *error = NULL; 
+    NSData *json = [NSJSONSerialization dataWithJSONObject:cmd options:0 error:&error];
+    
+    if (!json) {
+        NSLog(@"Error: %@", error);
+        return;
+    }
+    uint32 len = [json length];
+    NSMutableData* cache = [[NSMutableData alloc] initWithLength:0];
+    [cache appendBytes:&len length:4];
+    [cache appendBytes:[json bytes] length:len];
+    [outputStream write:[cache bytes] maxLength:len+4];  
 }
 
 - (void)open {
+    if (!unconnected) {
+        return;
+    }
+    unconnected = NO;
+
     [self close];
 
     CFReadStreamRef readStream;
@@ -48,8 +72,6 @@
     
     [inputStream open];  
     [outputStream open];  
-    
-    return;
 }  
 
 - (void)close {  
@@ -63,26 +85,48 @@
     [outputStream setDelegate:nil];    
 }  
 
-- (void)received:(NSString *)data {
+- (void)received:(NSData*)data {
     NSError *error = nil;
-    id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+    id object = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableLeaves error:&error];
     if (error) {
         return;
     }
-    if([object isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *results = object;
+    if (![object isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    NSDictionary *cmd = object;
+    NSString *action = [cmd objectForKey:@"action"];
+    if ([action isEqualToString:@"show"]) {
+        NSString *path = [cmd objectForKey:@"path"];
+        NSImage *icon = [icons objectForKey:path];
+        if (!icon) {
+            icon = [[NSImage alloc] initWithContentsOfFile:path];
+            if (icon) {
+                [icons setValue:icon forKey:path];
+            }
+        }
+        if (icon) {
+            [statusItem setImage:icon];
+        }
+        NSString *hint = [cmd objectForKey:@"hint"];
+        if (hint) {
+            [statusItem setToolTip:hint];
+        }
+    } else if ([action isEqualToString:@"exit"]) {
+        [NSApp terminate:self];
     }
 }
 
+- (void)handleTimer:(NSTimer*)timer {
+    [self open];
+}
+
 - (void)stream:(NSStream *)stream handleEvent:(NSStreamEvent)event {  
-    switch(event) {  
+    switch(event) {
         case NSStreamEventHasSpaceAvailable: {  
             if(stream != outputStream) {
                 break;
             }
-            //uint8_t *buf = (uint8_t *)[@"abc" UTF8String];  
-            //[outputStream write:buf maxLength:strlen((char *)buf)];  
-            //NSLog(@"Sent.");
             break;  
         }
 
@@ -97,7 +141,6 @@
                 if (headReading == 0) {
                     bodyReading = *((NSUInteger*)headCache);
                     [bodyCache setLength:0];
-                    NSLog(@"Head: %d", bodyReading);
                 } else {
                     break;
                 }
@@ -108,17 +151,26 @@
                 NSUInteger len = [inputStream read:buf maxLength:bodyReading];
                 bodyReading -= len;
                 [bodyCache appendBytes: (const void *)buf length:len];
-                if (bodyReading == 0) {
-                    headReading = 4;
-                    NSString *str = [[NSString alloc] initWithData:bodyCache encoding:NSASCIIStringEncoding];
-                    NSLog(@"Body: %@", str);
-                } else {
+                if (bodyReading != 0) {
                     break;
                 }
+                headReading = 4;
+                [self received: bodyCache];
             }
             break;  
         }
 
+        case NSStreamEventOpenCompleted: {
+            [statusItem setTitle:@""];
+            break;
+        }
+        case NSStreamEventEndEncountered:
+        case NSStreamEventErrorOccurred: {
+            [statusItem setTitle:@"!"];
+            unconnected = YES;
+            [self close];
+            break;
+        }
         default: {
             NSLog(@"Event: %lu", event);
             break;  

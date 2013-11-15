@@ -23,7 +23,7 @@ func main() {
 	tray.OnClick(func() {
 		println("clicked")
 	})
-	err := tray.Show("idle.png")
+	err := tray.Show("idle.ico", "Test systray")
 	if err != nil {
 		println(err.Error())
 	}
@@ -37,7 +37,7 @@ func main() {
 		if len(line) == 0 {
 			break;
 		}
-		err := tray.Show(line)
+		err := tray.Show(line, line)
 		if err != nil {
 			println(err.Error())
 		}
