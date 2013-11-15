@@ -1,13 +1,20 @@
-Systray
+Systray (Trayicon / Menu Extras)
 =======
 
 
-## Cross platform systray (trayicon/menu extras) for golang
+## Cross platform systray for golang
 
 Instead of gui program, "go-program + systray + web-console" might be a interesting choise.
 
 
-## Example
+# Platform
+
+Mac: avalid
+Win: coming soon
+Linux: not yet
+
+
+## Run example
 
 Mac:
 ```
@@ -15,6 +22,7 @@ cd example
 go run icons/mac systray
 ```
 
+## Avali
 
 ## How it works
 
