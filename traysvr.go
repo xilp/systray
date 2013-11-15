@@ -18,9 +18,10 @@ func (p *_SystraySvr) Run() error {
 	if err != nil {
 		return err
 	}
-	if out != nil {
-		return errors.New(string(out))
-	}
+	//if out != nil {
+	//	return errors.New(string(out))
+	//}
+	_ = out
 	return p.serve()
 }
 
@@ -55,6 +56,7 @@ func (p *_SystraySvr) serve() error {
 
 	for {
 		conn, err := ln.Accept()
+		println("Accepted")
 		if err != nil {
 			return err
 		}
@@ -71,6 +73,8 @@ func (p *_SystraySvr) serve() error {
 					println(err.Error())
 					break
 				}
+
+				println("received")
 
 				buf := new(bytes.Buffer)
 				_, err = io.CopyN(buf, conn, int64(n))
@@ -93,6 +97,7 @@ func (p *_SystraySvr) serve() error {
 			delete(p.conns, conn)
 			p.lock.Unlock()
 			conn.Close()
+			println("Closed. conns: ", len(p.conns))
 		}(conn)
 	}
 }
@@ -102,6 +107,17 @@ func (p *_SystraySvr) send(cmd map[string]string) error {
 	if err != nil {
 		return err
 	}
+
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, uint32(len(data)))
+	if err != nil {
+		return err
+	}
+	err = binary.Write(buf, binary.LittleEndian, data)
+	if err != nil {
+		return err
+	}
+	data = buf.Bytes()
 
 	p.lock.Lock()
 	defer p.lock.Unlock()

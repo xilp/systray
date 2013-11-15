@@ -26,12 +26,12 @@ func main() {
 	err := tray.Show("idle.png")
 	if err != nil {
 		println(err.Error())
-		return
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		println("Input icon file name:")
+		print(">> ")
 		data, _, _ := reader.ReadLine()
 		line := string(data)
 		if len(line) == 0 {
