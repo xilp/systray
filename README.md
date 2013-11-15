@@ -1,4 +1,4 @@
-Systray (Trayicon / Menu Extras)
+Systray (Trayicon/Menu Extras)
 =======
 
 
@@ -21,8 +21,6 @@ Mac:
 cd example
 go run icons/mac systray
 ```
-
-## Avali
 
 ## How it works
 
