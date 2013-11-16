@@ -6,8 +6,12 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    port = [[defaults objectForKey: @"xilp_systray_port"] intValue];
+    if (port <= 0) {
+        port = 6333;
+    }
     host = @"127.0.0.1";
-    port = 6333;
 
     statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
     [statusItem setAction:@selector(clicked:)];
