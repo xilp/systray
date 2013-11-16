@@ -14,7 +14,10 @@ import (
 
 func (p *_SystraySvr) Run() error {
 	go func() {
-		_, err := exec.Command(p.clientPath).Output()
+		if len(p.clientPath) == 0 {
+			return
+		}
+		_, err := exec.Command(p.clientPath, "-xilp_systray_port", strconv.Itoa(p.port)).Output()
 		if err != nil {
 			panic(err)
 		}
