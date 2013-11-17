@@ -2,6 +2,7 @@ package systray
 
 import (
 	"errors"
+	"path/filepath"
 	"unsafe"
 	"syscall"
 )
@@ -25,12 +26,23 @@ func (p *_Systray) Run() error {
 	if (hinst == 0) {
 		return errors.New("can't get module handle")
 	}
+	cursor, _, _ := LoadCursor.Call(0, IDC_ARROW)
+	if (cursor == 0) {
+		return errors.New("can't get cursor")
+	}
+	icon, _, _ := LoadIcon.Call(0, uintptr(IDI_APPLICATION))
+	if icon == 0 {
+		return errors.New("can't get app icon")
+	}
 
 	var wclass WNDCLASSEX
 	wclass.CbSize = uint32(unsafe.Sizeof(wclass))
 	wclass.LpfnWndProc = syscall.NewCallback(proc)
 	wclass.HInstance = HINSTANCE(hinst)
 	wclass.LpszClassName = name
+	wclass.HbrBackground = COLOR_WINDOW + 1
+	wclass.HCursor = HCURSOR(cursor)
+	wclass.HIcon = HICON(icon)
 
 	result, _, _ := RegisterClassEx.Call(uintptr(unsafe.Pointer(&wclass)))
 	if (result == 0) {
@@ -45,7 +57,7 @@ func (p *_Systray) Run() error {
 		WS_EX_APPWINDOW,
 		uintptr(unsafe.Pointer(name)),
 		uintptr(unsafe.Pointer(name)),
-		WS_MINIMIZE,
+		WS_OVERLAPPEDWINDOW ,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -57,6 +69,16 @@ func (p *_Systray) Run() error {
 
 	if (p.hwin == 0) {
 		return errors.New("create win failed")
+	}
+
+	msg := uintptr(unsafe.Pointer(&MSG{}))
+	for {
+		result, _, _ := GetMessage.Call(msg, 0, 0, 0)
+		if (result == 0) {
+			break
+		}
+		TranslateMessage.Call(msg);
+		DispatchMessage.Call(msg);
 	}
 	return nil
 }
@@ -73,9 +95,10 @@ func (p *_Systray) Stop() error {
 }
 
 func (p *_Systray) Show(file string, hint string) error {
+	path := filepath.Join(p.iconPath, file)
 	icon, _, _ := LoadImage.Call(
 		0,
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(file))),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(path))),
 		IMAGE_ICON,
 		0,
 		0,
@@ -89,24 +112,35 @@ func (p *_Systray) Show(file string, hint string) error {
 	}
 
 	flag := uint32(NIF_ICON | NIF_MESSAGE)
-	if len(hint) != 0{
+	if len(hint) != 0 {
 		flag = flag | NIF_TIP
 	}
 
-	nid := &NOTIFYICONDATA{}
-	nid.CbSize = uint32(unsafe.Sizeof(nid))
-	nid.HWnd = HWND(p.hwin)
-	nid.UID = 1
+	var nid *NOTIFYICONDATA
+	if (p.nid != nil) {
+		nid = p.nid
+	} else {
+		nid = &NOTIFYICONDATA{}
+		nid.CbSize = uint32(unsafe.Sizeof(nid))
+		nid.HWnd = HWND(p.hwin)
+		nid.UID = 1
+		nid.UCallbackMessage = WM_TRAYICON
+	}
+
 	nid.UFlags = flag
-	nid.UCallbackMessage = WM_TRAYICON
 	nid.HIcon = HICON(icon)
 	copy(nid.SzTip[:], syscall.StringToUTF16(hint))
 
-	result, _, _ := Shell_NotifyIcon.Call(NIM_ADD, uintptr(unsafe.Pointer(nid)))
-	if (result == 0) {
-		return errors.New("show failed")
+	var result uintptr
+	if (p.nid != nil) {
+		result, _, _ = Shell_NotifyIcon.Call(NIM_MODIFY, uintptr(unsafe.Pointer(nid)))
+	} else {
+		result, _, _ = Shell_NotifyIcon.Call(NIM_ADD, uintptr(unsafe.Pointer(nid)))
+		p.nid = nid
 	}
-	p.nid = nid
+	if (result == 0) {
+		return errors.New("shell show call failed")
+	}
 	return nil
 }
 
@@ -182,56 +216,73 @@ type WNDCLASSEX struct {
 	HIconSm       HICON
 }
 
+type MSG struct {
+	HWnd    HWND
+	Message uint32
+	WParam  uintptr
+	LParam  uintptr
+	Time    uint32
+	Pt      POINT
+}
+
 const (
-    WM_LBUTTONUP = 0x0202
-    WM_LBUTTONDBLCLK = 0x0203
-    WM_RBUTTONUP = 0x0205
-    WM_DESTROY = 0x0002
-    WM_USER = 0x0400
+	WM_LBUTTONUP = 0x0202
+	WM_LBUTTONDBLCLK = 0x0203
+	WM_RBUTTONUP = 0x0205
+	WM_DESTROY = 0x0002
+	WM_USER = 0x0400
 
-    WS_MINIMIZE = 0x20000000
-    WS_EX_APPWINDOW = 0x00040000
-    CW_USEDEFAULT = 0x80000000
+	WS_EX_APPWINDOW = 0x00040000
+	CW_USEDEFAULT = 0x80000000
 
-    CS_GLOBALCLASS = 0x4000
-    CS_NOCLOSE = 0x0200
+	CS_GLOBALCLASS = 0x4000
+	CS_NOCLOSE = 0x0200
 
-    NIM_ADD = 0x00000000
-    NIM_DELETE = 0x00000002
-    NIM_MODIFY = 0x00000001
+	NIM_ADD = 0x00000000
+	NIM_MODIFY = 0x00000001
+	NIM_DELETE = 0x00000002
 
-    NIF_MESSAGE = 0x00000001
-    NIF_ICON = 0x00000002
-    NIF_TIP = 0x00000004
-    NIF_INFO = 0x00000010
-    NIIF_INFO = 0x00000001
+	NIF_MESSAGE = 0x00000001
+	NIF_ICON = 0x00000002
+	NIF_TIP = 0x00000004
+	NIF_INFO = 0x00000010
+	NIIF_INFO = 0x00000001
 
-    MF_STRING = 0x00000000
-    TPM_RETURNCMD = 0x0100
+	MF_STRING = 0x00000000
+	TPM_RETURNCMD = 0x0100
 
-    IMAGE_BITMAP = 0
-    IMAGE_ICON = 1
-    LR_LOADFROMFILE = 0x00000010
-    LR_DEFAULTSIZE = 0x00000040
+	IMAGE_BITMAP = 0
+	IMAGE_ICON = 1
+	LR_LOADFROMFILE = 0x00000010
+	LR_DEFAULTSIZE = 0x00000040
 
-    IDI_APPLICATION = 32512
+	IDC_ARROW = 32512
+	COLOR_WINDOW = 5
+	WS_OVERLAPPEDWINDOW = 0X00000000 | 0X00C00000 | 0X00080000 | 0X00040000 | 0X00020000 | 0X00010000
+
+	IDI_APPLICATION = 32512
 	WM_TRAYICON = WM_USER + 69
 )
 
 var (
-	kernel32 = syscall.NewLazyDLL("kernel32")
-	GetModuleHandle = kernel32.NewProc("GetModuleHandleW")
+	kernel32 = syscall.MustLoadDLL("kernel32")
+	GetModuleHandle = kernel32.MustFindProc("GetModuleHandleW")
+	GetConsoleWindow = kernel32.MustFindProc("GetConsoleWindow")
 
-	shell32 = syscall.NewLazyDLL("shell32.dll")
-	Shell_NotifyIcon = shell32.NewProc("Shell_NotifyIconW")
+	shell32 = syscall.MustLoadDLL("shell32.dll")
+	Shell_NotifyIcon = shell32.MustFindProc("Shell_NotifyIconW")
 
-	user32 = syscall.NewLazyDLL("user32.dll")
-	LoadImage = user32.NewProc("LoadImageW")
-	LoadIcon = user32.NewProc("LoadIcon")
-	DefWindowProc = user32.NewProc("DefWindowProcW")
-	RegisterClassEx = user32.NewProc("RegisterClassEx")
-	GetDesktopWindow = user32.NewProc("GetDesktopWindow")
-	CreateWindowEx = user32.NewProc("CreateWindowExW")
+	user32 = syscall.MustLoadDLL("user32.dll")
+	GetMessage = user32.MustFindProc("GetMessageW")
+	TranslateMessage = user32.MustFindProc("TranslateMessage")
+	DispatchMessage= user32.MustFindProc("DispatchMessageW")
+	ShowWindow = user32.MustFindProc("ShowWindow")
+	UpdateWindow = user32.MustFindProc("UpdateWindow")
+	DefWindowProc = user32.MustFindProc("DefWindowProcW")
+	RegisterClassEx = user32.MustFindProc("RegisterClassExW")
+	GetDesktopWindow = user32.MustFindProc("GetDesktopWindow")
+	CreateWindowEx = user32.MustFindProc("CreateWindowExW")
+	LoadImage = user32.MustFindProc("LoadImageW")
+	LoadIcon = user32.MustFindProc("LoadIconW")
+	LoadCursor = user32.MustFindProc("LoadCursorW")
 )
-
-
