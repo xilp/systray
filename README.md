@@ -25,7 +25,7 @@ go run icons/mac systray
 ## How it works
 
 Win:  
-    [your code in go] -> [win32 api call in go]
+    [your code in go] -> [systray: win32 api call in go]
 
 Mac:  
     [your code in go] -> [systray.Server in go] -(tcp)-> [systray.Client in objc]
