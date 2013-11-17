@@ -20,7 +20,7 @@ func (p *_Systray) Run() error {
 		return result
 	}
 
-	name := syscall.StringToUTF16Ptr("Trayicon")
+	name := syscall.StringToUTF16Ptr("Systray")
 
 	hinst, _, _ := GetModuleHandle.Call(0)
 	if (hinst == 0) {
@@ -163,27 +163,6 @@ type _Systray struct {
 	dclick func()
 }
 
-type POINT struct {
-	X, Y int32
-}
-
-type (
-	HANDLE uintptr
-	HINSTANCE HANDLE
-	HCURSOR HANDLE
-	HICON HANDLE
-	HWND HANDLE
-	HGDIOBJ HANDLE
-	HBRUSH HGDIOBJ
-)
-
-type GUID struct {
-	Data1 uint32
-	Data2 uint16
-	Data3 uint16
-	Data4 [8]byte
-}
-
 type NOTIFYICONDATA struct {
 	CbSize           uint32
 	HWnd             HWND
@@ -199,6 +178,13 @@ type NOTIFYICONDATA struct {
 	SzInfoTitle      [64]uint16
 	DwInfoFlags      uint32
 	GuidItem         GUID
+}
+
+type GUID struct {
+	Data1 uint32
+	Data2 uint16
+	Data3 uint16
+	Data4 [8]byte
 }
 
 type WNDCLASSEX struct {
@@ -225,18 +211,30 @@ type MSG struct {
 	Pt      POINT
 }
 
+type POINT struct {
+	X, Y int32
+}
+
+type (
+	HANDLE uintptr
+	HINSTANCE HANDLE
+	HCURSOR HANDLE
+	HICON HANDLE
+	HWND HANDLE
+	HGDIOBJ HANDLE
+	HBRUSH HGDIOBJ
+)
+
 const (
 	WM_LBUTTONUP = 0x0202
 	WM_LBUTTONDBLCLK = 0x0203
 	WM_RBUTTONUP = 0x0205
-	WM_DESTROY = 0x0002
 	WM_USER = 0x0400
+	WM_TRAYICON = WM_USER + 69
 
 	WS_EX_APPWINDOW = 0x00040000
+	WS_OVERLAPPEDWINDOW = 0X00000000 | 0X00C00000 | 0X00080000 | 0X00040000 | 0X00020000 | 0X00010000
 	CW_USEDEFAULT = 0x80000000
-
-	CS_GLOBALCLASS = 0x4000
-	CS_NOCLOSE = 0x0200
 
 	NIM_ADD = 0x00000000
 	NIM_MODIFY = 0x00000001
@@ -245,11 +243,6 @@ const (
 	NIF_MESSAGE = 0x00000001
 	NIF_ICON = 0x00000002
 	NIF_TIP = 0x00000004
-	NIF_INFO = 0x00000010
-	NIIF_INFO = 0x00000001
-
-	MF_STRING = 0x00000000
-	TPM_RETURNCMD = 0x0100
 
 	IMAGE_BITMAP = 0
 	IMAGE_ICON = 1
@@ -258,10 +251,8 @@ const (
 
 	IDC_ARROW = 32512
 	COLOR_WINDOW = 5
-	WS_OVERLAPPEDWINDOW = 0X00000000 | 0X00C00000 | 0X00080000 | 0X00040000 | 0X00020000 | 0X00010000
 
 	IDI_APPLICATION = 32512
-	WM_TRAYICON = WM_USER + 69
 )
 
 var (
