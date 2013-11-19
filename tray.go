@@ -5,5 +5,5 @@ func New(iconPath string, clientPath string, port int) *Systray {
 }
 
 type Systray struct {
-	_Systray
+	*_Systray
 }

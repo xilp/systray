@@ -15,7 +15,7 @@
 
     statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
     [statusItem setAction:@selector(clicked:)];
-    [statusItem setHighlightMode:YES];
+    //[statusItem setHighlightMode:YES];
 
     timer = [NSTimer scheduledTimerWithTimeInterval:3 target:self selector:@selector(handleTimer:) userInfo:nil repeats:YES];
     unconnected = YES;
