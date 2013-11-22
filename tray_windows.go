@@ -14,9 +14,11 @@ func (p *_Systray) Stop() error {
 	}
 	nid.CbSize = uint32(unsafe.Sizeof(nid))
 
-	ret, _, _ := Shell_NotifyIcon.Call(NIM_DELETE, uintptr(unsafe.Pointer(&nid)))
+	Shell_NotifyIcon.Call(NIM_DELETE, uintptr(unsafe.Pointer(&nid)))
+
+	ret, _, _ := DestroyWindow.Call(p.mhwnd)
 	if ret == 0 {
-		return errors.New("shell notify delete failed")
+		return errors.New("exit failed")
 	}
 	return nil
 }
@@ -404,6 +406,7 @@ var (
 	
 	ShowWindow = user32.MustFindProc("ShowWindow")
 	UpdateWindow = user32.MustFindProc("UpdateWindow")
+	DestroyWindow = user32.MustFindProc("DestroyWindow")
 	DefWindowProc = user32.MustFindProc("DefWindowProcW")
 	RegisterClassEx = user32.MustFindProc("RegisterClassExW")
 	GetDesktopWindow = user32.MustFindProc("GetDesktopWindow")
