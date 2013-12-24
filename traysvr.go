@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -13,6 +14,11 @@ import (
 )
 
 func (p *_SystraySvr) Run() error {
+	_, err := os.Stat(p.clientPath)
+	if err != nil {
+		return err
+	}
+
 	go func() {
 		if len(p.clientPath) == 0 {
 			return
